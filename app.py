@@ -13,12 +13,22 @@ if "athletes" not in st.session_state:
 if "injuries" not in st.session_state:
     st.session_state.injuries = []
 
+if "medications" not in st.session_state:
+    st.session_state.medications = []
+
 st.title("🏃 Gestione Atleti")
-st.caption("Demo semplice online - versione iniziale")
+st.caption("Demo semplice online - versione 2 con area Farmaci / Antidoping")
 
 menu = st.sidebar.radio(
     "Menu",
-    ["Dashboard", "Scheda atleta", "Nuovo infortunio", "Archivio infortuni", "Statistiche"]
+    [
+        "Dashboard",
+        "Scheda atleta",
+        "Farmaci / Antidoping",
+        "Nuovo infortunio",
+        "Archivio infortuni",
+        "Statistiche"
+    ]
 )
 
 # =========================
@@ -29,10 +39,12 @@ if menu == "Dashboard":
 
     totale_atleti = len(st.session_state.athletes)
     totale_infortuni = len(st.session_state.injuries)
+    totale_farmaci = len(st.session_state.medications)
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric("Atleti registrati", totale_atleti)
     col2.metric("Infortuni registrati", totale_infortuni)
+    col3.metric("Farmaci / integratori registrati", totale_farmaci)
 
     if totale_infortuni > 0:
         prognosi_tot = 0
@@ -41,14 +53,16 @@ if menu == "Dashboard":
                 prognosi_tot += int(i["prognosi_giorni"])
             except:
                 pass
-        col3.metric("Giorni prognosi totali", prognosi_tot)
+        col4.metric("Giorni prognosi totali", prognosi_tot)
     else:
-        col3.metric("Giorni prognosi totali", 0)
+        col4.metric("Giorni prognosi totali", 0)
 
     st.markdown("---")
 
     st.subheader("Cosa fa questa demo")
     st.write("- inserimento scheda atleta")
+    st.write("- gestione farmaci e integratori per atleta")
+    st.write("- controllo amministrativo area antidoping")
     st.write("- inserimento infortunio")
     st.write("- archivio rapido")
     st.write("- statistiche base di fine stagione")
@@ -113,13 +127,112 @@ elif menu == "Scheda atleta":
         st.write("Nessun atleta inserito.")
 
 # =========================
+# FARMACI / ANTIDOPING
+# =========================
+elif menu == "Farmaci / Antidoping":
+    st.header("Farmaci / Antidoping")
+
+    if not st.session_state.athletes:
+        st.warning("Prima inserisci almeno un atleta nella sezione Scheda atleta.")
+    else:
+        elenco_atleti = [
+            f"{a['cognome']} {a['nome']}" for a in st.session_state.athletes
+        ]
+
+        tab1, tab2 = st.tabs(["Nuovo farmaco / integratore", "Archivio farmaci"])
+
+        with tab1:
+            with st.form("form_farmaco"):
+                atleta = st.selectbox("Atleta *", elenco_atleti)
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    tipo_prodotto = st.selectbox(
+                        "Tipologia *",
+                        ["Farmaco", "Integratore"]
+                    )
+                    nome_prodotto = st.text_input("Nome farmaco / integratore *")
+                    principio_attivo = st.text_input("Principio attivo")
+                    dosaggio = st.text_input("Dosaggio")
+                    via_somministrazione = st.selectbox(
+                        "Via di somministrazione",
+                        ["Orale", "Intramuscolare", "Endovenosa", "Topica", "Inalatoria", "Altra"]
+                    )
+                    frequenza = st.text_input("Frequenza")
+
+                with col2:
+                    data_inizio = st.text_input("Data inizio")
+                    data_fine = st.text_input("Data fine")
+                    motivo = st.text_input("Motivo / indicazione clinica")
+                    prescrittore = st.text_input("Medico prescrittore")
+                    tue = st.selectbox("Necessita TUE?", ["No", "Si", "Da valutare"])
+                    documentazione = st.selectbox("Documentazione presente?", ["No", "Si"])
+
+                stato_verifica = st.selectbox(
+                    "Stato verifica antidoping",
+                    ["Da verificare", "Consentito", "Attenzione", "Vietato / da approfondire"]
+                )
+
+                note = st.text_area("Note")
+
+                salva_farmaco = st.form_submit_button("Salva farmaco / integratore")
+
+                if salva_farmaco:
+                    if not atleta or not nome_prodotto:
+                        st.error("Inserisci almeno atleta e nome del prodotto.")
+                    else:
+                        farmaco = {
+                            "atleta": atleta,
+                            "tipologia": tipo_prodotto,
+                            "nome_prodotto": nome_prodotto,
+                            "principio_attivo": principio_attivo,
+                            "dosaggio": dosaggio,
+                            "via_somministrazione": via_somministrazione,
+                            "frequenza": frequenza,
+                            "data_inizio": data_inizio,
+                            "data_fine": data_fine,
+                            "motivo": motivo,
+                            "prescrittore": prescrittore,
+                            "tue": tue,
+                            "documentazione": documentazione,
+                            "stato_verifica": stato_verifica,
+                            "note": note
+                        }
+                        st.session_state.medications.append(farmaco)
+                        st.success(f"Voce salvata per {atleta}")
+
+        with tab2:
+            if st.session_state.medications:
+                filtro_atleta = st.selectbox(
+                    "Filtra per atleta",
+                    ["Tutti"] + elenco_atleti
+                )
+
+                df_farmaci = pd.DataFrame(st.session_state.medications)
+
+                if filtro_atleta != "Tutti":
+                    df_farmaci = df_farmaci[df_farmaci["atleta"] == filtro_atleta]
+
+                st.dataframe(df_farmaci, use_container_width=True)
+
+                st.markdown("---")
+                st.subheader("Riepilogo stato verifica")
+                st.dataframe(
+                    df_farmaci["stato_verifica"].value_counts().reset_index(),
+                    use_container_width=True
+                )
+            else:
+                st.write("Nessun farmaco o integratore registrato.")
+
+# =========================
 # NUOVO INFORTUNIO
 # =========================
 elif menu == "Nuovo infortunio":
     st.header("Nuovo infortunio")
 
     if not st.session_state.athletes:
-        st.warning("Prima inserisci almeno un atleta nella sezione 'Scheda atleta'.")
+        st.warning("Prima inserisci almeno un atleta nella sezione Scheda atleta.")
     else:
         elenco_atleti = [
             f"{a['cognome']} {a['nome']}" for a in st.session_state.athletes
@@ -256,24 +369,27 @@ elif menu == "Statistiche":
 
         st.subheader("Infortuni per distretto")
         st.dataframe(
-            df["distretto"].value_counts().reset_index().rename(
-                columns={"index": "Distretto", "distretto": "Totale"}
-            ),
+            df["distretto"].value_counts().reset_index(),
             use_container_width=True
         )
 
         st.subheader("Infortuni per tipo")
         st.dataframe(
-            df["tipo_tessuto"].value_counts().reset_index().rename(
-                columns={"index": "Tipo", "tipo_tessuto": "Totale"}
-            ),
+            df["tipo_tessuto"].value_counts().reset_index(),
             use_container_width=True
         )
 
         st.subheader("Infortuni per modalita")
         st.dataframe(
-            df["meccanismo"].value_counts().reset_index().rename(
-                columns={"index": "Modalita", "meccanismo": "Totale"}
-            ),
+            df["meccanismo"].value_counts().reset_index(),
             use_container_width=True
         )
+
+        if st.session_state.medications:
+            st.markdown("---")
+            st.subheader("Situazione Farmaci / Antidoping")
+            df_farmaci = pd.DataFrame(st.session_state.medications)
+            st.dataframe(
+                df_farmaci["stato_verifica"].value_counts().reset_index(),
+                use_container_width=True
+            )
